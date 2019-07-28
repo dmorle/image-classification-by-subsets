@@ -1,93 +1,74 @@
 import random
 import pickle
-import numpy as np
-from Convolution import convolution as conv
-from Maxpool import maxpool as maxp
+from GDAlgorithm import *
+from NNLinearAlg import *
 
 """
-#----------------------------------- this section defines the structure of the CNN net ----------------------------------#
-
-The kLayerSize input is a list of tuples with entries as follows:
+CNNstruct is a list which defines the structure of the convolutional neural network:
 	[
-	(x, y, z, kernelNum),	# 1st conv layer kernel shape
-	(x, y, z, kernelNum),	# 2nd conv layer kernel shape
-	:						
-	# number of conv layers = len of list
+		lists containing the size of kernels at the indexed layer;
+			# of kernels, x, y, z
 	]
-
-The kStrideSize input is a list of np.ndarray s in form:
-	[
-	(stride array),	# 1st conv layer stride values
-	(stride array),	# 2nd conv layer stride values
-	:
-	# number of conv layers = len of list
-	]
-
-#####################################################################
-
-the poolInfo input is a list of np.ndarray s in form:
-	[
-	(size tuple), (stride tuple),	# 1st pool layer; type = int32
-	(size tuple), (stride tuple),	# 2nd pool layer; type = int32
-	:
-	# number of pool layers = len of list
-	]
-
-#####################################################################
-
-The ordering input is a list of booleans:
-	false 	=> convolution layer
-	true 	=> maxpool layer
-
-This imposes limitations, somme of which are listed below:
-	len(ordering) = len(kLayerSize) + len(poolInfo)
-
-#----------------------------------- this section defines the structure of the LSTM net ----------------------------------#
-
-TBD
+An empty entry denotes a MaxPool layer
 
 """
 
 class NeuralNetwork:
-	def __init__(self, kLayerSize, kStrideSize, poolInfo, ordering, n = 257, p = 100):
-
-		#stuff for the CNN
-		self.__kVals__ = list()
-		for layerShape in kLayerSize:
-			self.__kVals__.append(np.random.random_sample(layerShape))
-		self.__kStride__ = kStrideSize
-		self.__poolInfo__ = poolInfo
-		self.__ordering__ = ordering
+	def __init__(self, CNNstruct, n = 257, p = 100):
+		#declaring the CNN and initializing it with random kernels
+		self.CNNstruct = CNNstruct
+		self.kVals = list()
+		self.order = list()
+		for layerInfo in CNNstruct:
+			if len(layerInfo) == 4:
+				self.order.append(True)
+				layer = list()
+				for kNum in range(layerInfo[0]):
+					kernel = list()
+					for x in range(layerInfo[1]):
+						row = list()
+						for y in range(layerInfo[2]):
+							pixel = list()
+							for z in range(layerInfo[3]):
+								pixel.append(random.uniform(-1, 1))
+							row.append(pixel)
+						kernel.append(row)
+					layer.append(kernel)
+				self.kVals.append(layer)
+			else:
+				self.order.append(False)
+				self.kVals.append(None)
 
 		#declaring the LSTM and initializing it with random weights and biases
-		self.__n__ = n
-		self.__p__ = p
-		self.__m__ = n + p
+		self.n = n
+		self.p = p
+		self.m = self.n + self.p
 
-		self.__Wf__, self.__Wi__, self.__Wc__, self.__Wo__ = (np.random.rand(n, self.__m__) for i in range(4))
-		self.__bf__, self.__bi__, self.__bc__, self.__bo__ = (np.random.rand(n) for i in range(4))
-		return
-
-	def run(self, Image):
-		cellState = np.zeros(self.__n__)
-		hiddenState = np.zeros(self.__n__)
-		for cell in Image:
-			# run ConvNet on cell
-			convCount = 0
-			poolCount = 0
-			for layerType in self.__order__:
-				if layerType:
-					# run pool
-					cell = pool(cell, size = self.__poolInfo__[poolCount][0], stride = self.__poolInfo__[poolCount][1])S
-					poolCount += 1
-				else:
-					# run conv
-					cell = conv(cell, self.__kVals__[convCount], stride = self.__kStride__[convCount])
-					convCount += 1
-
-			# run LSTM
-			
-			# FML... I dont want to do this.................
+		self.Wf, self.Wi, self.Wc, self.Wo = (list() for i in range(4))
+		self.bf, self.bi, self.bc, self.bo = (list() for i in range(4))
+		for i in range(self.n):
+			self.bf.append(random.uniform(-1, 1))
+			self.bi.append(random.uniform(-1, 1))
+			self.bc.append(random.uniform(-1, 1))
+			self.bo.append(random.uniform(-1, 1))
+			Wfi, Wii, Wci, Woi = (list() for i in range(4))
+			for j in range(self.m):
+				Wfi.append(random.uniform(-1, 1))
+				Wii.append(random.uniform(-1, 1))
+				Wci.append(random.uniform(-1, 1))
+				Woi.append(random.uniform(-1, 1))
+			self.Wf.append(Wfi)
+			self.Wi.append(Wii)
+			self.Wc.append(Wci)
+			self.Wo.append(Woi)
+		self.Wf = matrix(self.Wf)
+		self.Wi = matrix(self.Wi)
+		self.Wc = matrix(self.Wc)
+		self.Wo = matrix(self.Wo)
+		self.bf = vector(self.bf)
+		self.bi = vector(self.bi)
+		self.bc = vector(self.bc)
+		self.bo = vector(self.bo)
 		return
 
 	def run(self, Image):
@@ -261,19 +242,23 @@ class NeuralNetwork:
 	def getError(self, a, y):
 		return
 
-	def __runConvNet__(self, image):
-		convNum = 0
-		poolNum = 0
-		for layerType in self.__ordering__:
-			if layerType:
-				# maxpool layer
-				image = maxpool(image, self.__poolInfo__[poolNum][0], self.__poolInfo__[poolNum][1])
-				poolNum += 1
-			else:
-				# conv layer
-				image = conv(image, self.__kVals__[convNum], self.__kStride__[convNum])
-				convNum += 1
-		return image
+def MaxPool(T):
+	image = list()
+	for i in range(0, len(T), 2):
+		row = list()
+		for j in range(0, len(T[0]), 2):
+			pixel = list()
+			for k in range(len(T[0][0])):
+				vals = [
+					T[i][j][k], 
+					T[i+1][j][k], 
+					T[i][j+1][k],
+					T[i+1][j+1][k]
+					]
+				pixel.append(max(vals))
+			row.append(pixel)
+		image.append(row)
+	return image
 
 def maxI(x):
 	I = 0
